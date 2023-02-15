@@ -224,18 +224,16 @@ class _VpcService(_AwsService):
             Filters=[{'Name': 'status-code', 'Values': ['active']}]
         )['VpcPeeringConnections']
 
+        account_id = self.current_account_id
+        region_name = self.conn._client_config.region_name
+
         peering_connections_per_vpc = defaultdict(int)
         for peering in peering_connections:
             for vpc in [peering['AccepterVpcInfo'], peering['RequesterVpcInfo']]:
                 # Each peering contains 2 VPCs and at least one is in our current account and region. To avoid incorrect alerts about out-of-scope VPCs we need to filter to only VPCs in our account and region.
 
-                if vpc['OwnerId'] != self.current_account_id:
-                    continue
-
-                if vpc['Region'] != "us-west-2": # TODO: How to get current region?
-                    continue
-
-                peering_connections_per_vpc[vpc['VpcId']] += 1
+                if vpc['OwnerId'] == account_id and vpc['Region'] == region_name:
+                    peering_connections_per_vpc[vpc['VpcId']] += 1
 
         for vpc_id, peerings in peering_connections_per_vpc.items():
             self.limits['Active VPC peering connections per VPC']._add_current_usage(
